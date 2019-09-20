@@ -3,6 +3,10 @@ SMTSampler: Efficient Stimulus Generation from Complex SMT Constraints
 
 [Paper](https://people.eecs.berkeley.edu/~rtd/papers/SMTSampler.pdf)
 
+# Update
+
+You may also want to also check out our new project [GuidedSampler](https://github.com/RafaelTupynamba/GuidedSampler), which is an extension of SMTSampler for coverage-guided sampling of solutions.
+
 # Building
 
 Install dependencies
@@ -22,10 +26,11 @@ Build z3 (with a patch to compute the coverage of a formula)
 
 ```
 cd z3
-git checkout bf4edef761a9aaf1d303bde50b7bc768e6e018aa
+git checkout bb7ad4e938ec3ade23282142119e77c838b1f7d1
 cp ../SMTSampler/z3-patch/mk_util.py scripts/mk_util.py
 cp ../SMTSampler/z3-patch/rewriter_def.h src/ast/rewriter/rewriter_def.h
 cp ../SMTSampler/z3-patch/model.cpp src/model/model.cpp
+cp ../SMTSampler/z3-patch/permutation_matrix.h src/util/lp/permutation_matrix.h
 python scripts/mk_make.py
 cd build
 make

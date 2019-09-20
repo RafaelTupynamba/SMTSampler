@@ -42,6 +42,7 @@ class SMTSampler {
     bool convert = false;
     bool const flip_internal = false;
     bool random_soft_bit = false;
+    z3::apply_result * res0;
     z3::goal * converted_goal;
     z3::params params;
     z3::optimize opt;
@@ -222,8 +223,7 @@ public:
     }
 
     void parse_smt() {
-        z3::expr_vector formulas = c.parse_file(input_file.c_str());
-	z3::expr formula = z3::mk_and(formulas);
+        z3::expr formula = c.parse_file(input_file.c_str());
         Z3_ast ast = formula;
         if (ast == NULL) {
             std::cout << "Could not read input formula.\n";
@@ -246,8 +246,8 @@ public:
             clock_gettime(CLOCK_REALTIME, &end);
             convert_time += duration(&start, &end);
 
-            assert(res.size() == 1);
-            converted_goal = new z3::goal(res[0]);
+            assert(res0->size() == 1);
+            converted_goal = new z3::goal((*res0)[0]);
             formula = converted_goal->as_expr();
 
             z3::solver s(c);
@@ -268,7 +268,7 @@ public:
             }
             z3::model m = s.get_model();
             ind = get_variables(m, true);
-            z3::model original = converted_goal->convert_model(m);
+            z3::model original = res0->convert_model(m);
             evaluate(original, smt_formula, true, 1);
 
             opt.add(formula);
@@ -785,7 +785,7 @@ public:
         if (convert) {
             struct timespec start, end;
             clock_gettime(CLOCK_REALTIME, &start);
-            z3::model converted = converted_goal->convert_model(m);
+            z3::model converted = res0->convert_model(m);
             sample = model_string(converted, variables);
             clock_gettime(CLOCK_REALTIME, &end);
             convert_time += duration(&start, &end);
@@ -928,21 +928,25 @@ public:
             } else if (v.is_const()) {
                 z3::expr b = m.get_const_interp(v);
                 Z3_ast ast = b;
-                if (!ast) {
-                    std::string num = "0";
-                    s += num + '\0';
-                    continue;
-                }
-                switch (b.get_sort().sort_kind()) {
+                switch (v.range().sort_kind()) {
                 case Z3_BV_SORT:
                 {
-                    std::string num = bv_string(b, c);
-                    s += num + '\0';
+                    if (!ast) {
+                        s += bv_string(c.bv_val(0, v.range().bv_size()), c) + '\0';
+                    } else {
+                        s += bv_string(b, c) + '\0';
+		    }
                     break;
                 }
                 case Z3_BOOL_SORT:
-                    s += std::to_string(b.bool_value() == Z3_L_TRUE) + '\0';
+		{
+                    if (!ast) {
+                        s += std::to_string(false) + '\0';
+                    } else {
+                        s += std::to_string(b.bool_value() == Z3_L_TRUE) + '\0';
+		    }
                     break;
+		}
                 default:
                         std::cout << "Invalid sort\n";
                         exit(1);

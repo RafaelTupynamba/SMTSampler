@@ -339,9 +339,9 @@ void rewriter_tpl<Config>::process_app(app * t, frame & fr) {
             UNREACHABLE();
         }
         // TODO: add rewrite rules support
-        expr * def = nullptr;
-        proof * def_pr = nullptr;
-        quantifier * def_q = nullptr;
+        expr * def;
+        proof * def_pr;
+        quantifier * def_q;
         // When get_macro succeeds, then
         // we know that:
         // forall X. f(X) = def[X]
@@ -641,17 +641,6 @@ void rewriter_tpl<Config>::set_inv_bindings(unsigned num_bindings, expr * const 
     }
     TRACE("rewriter", display_bindings(tout););
 }
-
-template<typename Config>
-void rewriter_tpl<Config>::update_inv_binding_at(unsigned i, expr* binding) {
-    m_bindings[i] = binding;
-}
-
-template<typename Config>
-void rewriter_tpl<Config>::update_binding_at(unsigned i, expr* binding) {
-    m_bindings[m_bindings.size() - i - 1] = binding;
-}
-
 
 template<typename Config>
 template<bool ProofGen>

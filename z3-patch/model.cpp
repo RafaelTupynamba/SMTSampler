@@ -201,34 +201,43 @@ void process_coverage(expr_ref & m_r, app * t, ast_manager & m) {
 }
 
 model::model(ast_manager & m):
-    model_core(m),
-    m_mev(*this) {
+    model_core(m) {
 }
 
 model::~model() {
-    for (auto & kv : m_usort2universe) {
-        m_manager.dec_ref(kv.m_key);
-        m_manager.dec_array_ref(kv.m_value->size(), kv.m_value->c_ptr());
-        dealloc(kv.m_value);
+    sort2universe::iterator it3  = m_usort2universe.begin();
+    sort2universe::iterator end3 = m_usort2universe.end();
+    for (; it3 != end3; ++it3) {
+        m_manager.dec_ref(it3->m_key);
+        m_manager.dec_array_ref(it3->m_value->size(), it3->m_value->c_ptr());
+        dealloc(it3->m_value);
     }
 }
 
 
 
 void model::copy_const_interps(model const & source) {
-    for (auto const& kv : source.m_interp) {
-        register_decl(kv.m_key, kv.m_value);
+    decl2expr::iterator it1  = source.m_interp.begin();
+    decl2expr::iterator end1 = source.m_interp.end();
+    for (; it1 != end1; ++it1) {
+        register_decl(it1->m_key, it1->m_value);
     }
 }
 
 void model::copy_func_interps(model const & source) {
-    for (auto const& kv : source.m_finterp) 
-        register_decl(kv.m_key, kv.m_value->copy());
+    decl2finterp::iterator it2  = source.m_finterp.begin();
+    decl2finterp::iterator end2 = source.m_finterp.end();
+    for (; it2 != end2; ++it2) {
+        register_decl(it2->m_key, it2->m_value->copy());
+    }
 }
 
 void model::copy_usort_interps(model const & source) {
-    for (auto const& kv : source.m_usort2universe) 
-        register_usort(kv.m_key, kv.m_value->size(), kv.m_value->c_ptr());
+    sort2universe::iterator it3  = source.m_usort2universe.begin();
+    sort2universe::iterator end3 = source.m_usort2universe.end();
+    for (; it3 != end3; ++it3) {
+        register_usort(it3->m_key, it3->m_value->size(), it3->m_value->c_ptr());
+    }
 }
 
 model * model::copy() const {
@@ -251,14 +260,16 @@ void visit(expr * e) {
         visit(a->get_args()[i]);
 }
 
-bool model::eval_expr(expr * e, expr_ref & result, bool model_completion) {
+// Remark: eval is for backward compatibility. We should use model_evaluator.
+bool model::eval(expr * e, expr_ref & result, bool model_completion) {
     if (coverage_enable == 1) {
         visit(e);
         return true;
     }
-    scoped_model_completion _smc(*this, model_completion);
+    model_evaluator ev(*this);
+    ev.set_model_completion(model_completion);
     try {
-        result = (*this)(e);
+        ev(e, result);
         return true;
     }
     catch (model_evaluator_exception & ex) {
@@ -331,52 +342,32 @@ model * model::translate(ast_translation & translator) const {
     model * res = alloc(model, translator.to());
 
     // Translate const interps
-    for (auto const& kv : m_interp) 
-        res->register_decl(translator(kv.m_key), translator(kv.m_value));
+    decl2expr::iterator it1  = m_interp.begin();
+    decl2expr::iterator end1 = m_interp.end();
+    for (; it1 != end1; ++it1) {
+        res->register_decl(translator(it1->m_key), translator(it1->m_value));
+    }
 
     // Translate func interps
-    for (auto const& kv : m_finterp) {
-        func_interp * fi = kv.m_value;
-        res->register_decl(translator(kv.m_key), fi->translate(translator));
+    decl2finterp::iterator it2  = m_finterp.begin();
+    decl2finterp::iterator end2 = m_finterp.end();
+    for (; it2 != end2; ++it2) {
+        func_interp * fi = it2->m_value;
+        res->register_decl(translator(it2->m_key), fi->translate(translator));
     }
 
     // Translate usort interps
-    for (auto const& kv : m_usort2universe) {
+    sort2universe::iterator it3  = m_usort2universe.begin();
+    sort2universe::iterator end3 = m_usort2universe.end();
+    for (; it3 != end3; ++it3) {
         ptr_vector<expr> new_universe;
-        for (unsigned i=0; i < kv.m_value->size(); i++)
-            new_universe.push_back(translator(kv.m_value->get(i)));
-        res->register_usort(translator(kv.m_key),
+        for (unsigned i=0; i<it3->m_value->size(); i++)
+            new_universe.push_back(translator(it3->m_value->get(i)));
+        res->register_usort(translator(it3->m_key),
                             new_universe.size(),
                             new_universe.c_ptr());
     }
 
     return res;
-}
-
-expr_ref model::operator()(expr* t) {
-    return m_mev(t);
-}
-
-expr_ref_vector model::operator()(expr_ref_vector const& ts) {
-    expr_ref_vector rs(m());
-    for (expr* t : ts) rs.push_back((*this)(t));
-    return rs;
-}
-
-bool model::is_true(expr* t) {
-    return m().is_true((*this)(t));
-}
-
-bool model::is_false(expr* t) {
-    return m().is_false((*this)(t));
-}
-
-bool model::is_true(expr_ref_vector const& ts) {
-    for (expr* t : ts) if (!is_true(t)) return false;
-    return true;
-}
-
-void model::reset_eval_cache() {
-    m_mev.reset();
 }
 
